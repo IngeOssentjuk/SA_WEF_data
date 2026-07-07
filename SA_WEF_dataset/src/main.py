@@ -1,6 +1,3 @@
-from functools import reduce
-from collections import defaultdict
-
 from src.data_preprocessing import *
 from src.data_processing_domain_scores import *
 from src.data_processing_mapping import *

@@ -8,7 +8,6 @@ from scipy.stats import pearsonr
 from matplotlib.font_manager import FontProperties
 from libpysal.weights import Queen, w_subset
 from esda.moran import Moran
-import pingouin as pg
 
 def obtain_descriptive_statistics_df(df):
 
