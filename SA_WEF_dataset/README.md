@@ -2,7 +2,8 @@
 
 ## Description
 
-This repository contains the code used to wrangle and merge various existing datasets into a newly created collection of 
+This repository contains the code used to wrangle and merge various existing datasets (such as South African census and community survey data, 
+but also global gridded datasets of hydrological resources, crop and livestock production and OSM data) into a newly created collection of 
 datasets on household-level water-energy-food (WEF) security in South Africa. The security indicators are calculated at 
 either household or municipal level, aggregated to the local municipality level, and have national coverage. The resulting
 data is used for preparation of a scientific manuscript titled "A framework for spatially quantifying household-level 
