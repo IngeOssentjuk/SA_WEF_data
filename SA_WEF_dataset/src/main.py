@@ -2,6 +2,7 @@ from src.data_preprocessing import *
 from src.data_processing_domain_scores import *
 from src.data_processing_mapping import *
 from src.data_processing_statistics import *
+from functools import reduce
 
 # Directory data: change according to your own directory.
 input_dir_raw = "C:/Users/6145795/Documents/GitHub/SA_WEF_dataset/data/raw/"
@@ -24,6 +25,8 @@ area = 'rural'
 
 # set the method of combining two variables into one to either 'mean' or 'limiting factor'.
 aggregation_method = 'limiting_factor'
+epsilon = 0.0001
+
 # set the higher ('high') or lower ('low') end of the range of resource requirements for the final maps and statistics
 reqs = 'high'
 
@@ -224,43 +227,43 @@ threshold_value = 0.5
 # 1. PREPROCESSING
 # all the preprocessing steps can be commented out after an initial run with the raw data.
 
-# 1.1. LOAD RAW DATASETS
+# # 1.1. LOAD RAW DATASETS
+#
+# # Paths: replace with personal data paths
+# path_CE11 = os.path.join(input_dir_raw + "CE_2011/2011_individual_entries")
+# path_CS16 = os.path.join(input_dir_raw + "CS_2016")
+# path_CE22 = os.path.join(input_dir_raw + "CE_2022")
+#
+# # load household data
+# CE11_data = load_stata_files(path_CE11, "sa-census-2011-household-v1.1-20140618.dta")
+# CE22_data = load_stata_files(path_CE22, "sa-census-2022-household-v1.dta")
+#
+# CE11_hh = CE11_data[0]
+# CS16_hh = load_csv_files(path_CS16, "cs-2016-household.csv")
+# CE22_hh = CE22_data[0]
+# CE22_hh['QID'] = CE22_hh['QID'].astype(int)
+# CE22_spatial_vars = load_csv_files(path_CE22, "Census2022sample_F18.csv")
+# CE22_hh = pd.merge(CE22_hh, CE22_spatial_vars, on='QID')
+# CE22_agri_hh = pd.read_csv(os.path.join(path_CE22, "CE22_agri_hh.csv"), delimiter=';')
+#
+# # preprocess survey data: obtain only the entries that are included in the area scope
+# if area == 'rural':
+#     CE11_hh = select_rural_entries(CE11_hh, 'H_GEOTYPE')
+#     CS16_hh = select_rural_entries(CS16_hh, 'EA_GTYPE_C')
+#     CE22_hh = select_rural_entries(CE22_hh, 'Geo_type')
+# elif area == 'urban':
+#     CE11_hh = select_urban_entries(CE11_hh, 'H_GEOTYPE')
+#     CS16_hh = select_urban_entries(CS16_hh, 'EA_GTYPE_C')
+#     CE22_hh = select_urban_entries(CE22_hh, 'Geo_type')
+# else:
+#     pass
 
-# Paths: replace with personal data paths
-path_CE11 = os.path.join(input_dir_raw + "CE_2011/2011_individual_entries")
-path_CS16 = os.path.join(input_dir_raw + "CS_2016")
-path_CE22 = os.path.join(input_dir_raw + "CE_2022")
-
-# load household data
-CE11_data = load_stata_files(path_CE11, "sa-census-2011-household-v1.1-20140618.dta")
-CE22_data = load_stata_files(path_CE22, "sa-census-2022-household-v1.dta")
-
-CE11_hh = CE11_data[0]
-CS16_hh = load_csv_files(path_CS16, "cs-2016-household.csv")
-CE22_hh = CE22_data[0]
-CE22_hh['QID'] = CE22_hh['QID'].astype(int)
-CE22_spatial_vars = load_csv_files(path_CE22, "Census2022sample_F18.csv")
-CE22_hh = pd.merge(CE22_hh, CE22_spatial_vars, on='QID')
-CE22_agri_hh = pd.read_csv(os.path.join(path_CE22, "CE22_agri_hh.csv"), delimiter=';')
-
-# preprocess survey data: obtain only the entries that are included in the area scope
-if area == 'rural':
-    CE11_hh = select_rural_entries(CE11_hh, 'H_GEOTYPE')
-    CS16_hh = select_rural_entries(CS16_hh, 'EA_GTYPE_C')
-    CE22_hh = select_rural_entries(CE22_hh, 'Geo_type')
-elif area == 'urban':
-    CE11_hh = select_urban_entries(CE11_hh, 'H_GEOTYPE')
-    CS16_hh = select_urban_entries(CS16_hh, 'EA_GTYPE_C')
-    CE22_hh = select_urban_entries(CE22_hh, 'Geo_type')
-else:
-    pass
-
-# preprocess 2016 CS data: split municipal column (of the shape CODE : Name, to two columns 'MN_CODE_2016' and
-# 'MN_NAME_2016'
-CS16_hh[['MN_CODE_2016', 'MN_NAME_2016']] = CS16_hh['MN_CODE_2016'].str.split(' : ', n=1, expand=True)
-# rename the municipality code column to "LocalMunicipalityCode" to be consistent with the demarcations file:
-CS16_hh = CS16_hh.rename(columns={'MN_CODE_2016': 'LocalMunicipalityCode', 'MN_NAME_2016': 'LocalMunicipalityName'})
-CE22_hh = CE22_hh.rename(columns={'Municipality': 'LocalMunicipalityCode'})
+# # preprocess 2016 CS data: split municipal column (of the shape CODE : Name, to two columns 'MN_CODE_2016' and
+# # 'MN_NAME_2016'
+# CS16_hh[['MN_CODE_2016', 'MN_NAME_2016']] = CS16_hh['MN_CODE_2016'].str.split(' : ', n=1, expand=True)
+# # rename the municipality code column to "LocalMunicipalityCode" to be consistent with the demarcations file:
+# CS16_hh = CS16_hh.rename(columns={'MN_CODE_2016': 'LocalMunicipalityCode', 'MN_NAME_2016': 'LocalMunicipalityName'})
+# CE22_hh = CE22_hh.rename(columns={'Municipality': 'LocalMunicipalityCode'})
 
 # load spatial data
 MUN_boundaries_11 = load_spatial_data_shp('MN', 2011, input_dir_raw)  # the relevant column are "MN_NAME" and "MN_CODE"
@@ -268,42 +271,42 @@ MUN_boundaries_16 = load_spatial_data_gdb('MN', 2016, input_dir_raw)  # the rele
 MUN_boundaries_16.loc[:, 'LocalMunicipalityName'] = MUN_boundaries_16['LocalMunicipalityName'].replace('New', 'Collins Chabane')
 PR_boundaries = load_spatial_data_shp('PR', 2011, input_dir_raw)  # PR boundaries haven't changed
 
-# for area calculations, use albers equal area projection on spatial demarcation data:
-MUN_boundaries_16_EA = MUN_boundaries_16[['LocalMunicipalityCode', 'geometry']].to_crs(spatial_crs)
-MUN_boundaries_16_EA[f"mun_area_m2_({spatial_crs})"] = MUN_boundaries_16_EA.geometry.area
+# # for area calculations, use albers equal area projection on spatial demarcation data:
+# MUN_boundaries_16_EA = MUN_boundaries_16[['LocalMunicipalityCode', 'geometry']].to_crs(spatial_crs)
+# MUN_boundaries_16_EA[f"mun_area_m2_({spatial_crs})"] = MUN_boundaries_16_EA.geometry.area
+#
+# # data on changes in municipal demarcations and namings across spatial datasets
+# MUN_changes_11_16 = pd.read_csv(os.path.join(input_dir_processed + "municipal_demarcations_mapping_20112016.csv"),
+#                                 delimiter=';', encoding='latin1')
+# mun_mapping_CE22_agri = pd.read_csv(os.path.join(input_dir_processed + "mun_mapping_ce22agri_boundaries16.csv"), delimiter=';')
+#
+# # load population data
+# pop_total = pd.read_csv(os.path.join(input_dir_processed + "Municipal_population_rural_urban_1994_2024.csv"))
+# # pop_total = pop_total.infer_objects(copy=False).interpolate() # linear interpolation to avoid missing values
+# pop_11 = pop_total[['LocalMunicipalityCode', '2011_Total']].copy()
+# pop_11 = pop_11.rename(columns={'2011_Total': 'Population_mun_2011'})
+# pop_22 = pop_total[['LocalMunicipalityCode', '2022_Total']].copy()
+# pop_22 = pop_22.rename(columns={'2022_Total': 'Population_mun_2022'})
 
-# data on changes in municipal demarcations and namings across spatial datasets
-MUN_changes_11_16 = pd.read_csv(os.path.join(input_dir_processed + "municipal_demarcations_mapping_20112016.csv"),
-                                delimiter=';', encoding='latin1')
-mun_mapping_CE22_agri = pd.read_csv(os.path.join(input_dir_processed + "mun_mapping_ce22agri_boundaries16.csv"), delimiter=';')
-
-# load population data
-pop_total = pd.read_csv(os.path.join(input_dir_processed + "Municipal_population_rural_urban_1994_2024.csv"))
-# pop_total = pop_total.infer_objects(copy=False).interpolate() # linear interpolation to avoid missing values
-pop_11 = pop_total[['LocalMunicipalityCode', '2011_Total']].copy()
-pop_11 = pop_11.rename(columns={'2011_Total': 'Population_mun_2011'})
-pop_22 = pop_total[['LocalMunicipalityCode', '2022_Total']].copy()
-pop_22 = pop_22.rename(columns={'2022_Total': 'Population_mun_2022'})
-
-# based on the year set in the input data
-pop = pop_total[['LocalMunicipalityCode', f'{year}_Total', f'{year}_Rural']].copy()
-pop = pop.rename(columns={f'{year}_Total': f'Population_mun_{year}', f'{year}_Rural': f'Population_rural_mun_{year}'})
-population_column = f'Population_mun_{year}'
-population_column_rural = f'Population_rural_mun_{year}'
-
-# load household data for 2016:
-hh = pd.read_csv(os.path.join(input_dir_processed + "hh_ruralurban_MUN_2016.csv"))
-
-# obtain columns relevant for calculations per dataset
-CE11_columns_for_calc = ['SN', 'H_MUNIC', 'HHLD_10PERCENT_WGT']
-CS16_columns_for_calc = ['UqNo', 'LocalMunicipalityCode', 'LocalMunicipalityName', 'hhld_pstrwgt']
-CE22_columns_for_calc = ['QID', 'LocalMunicipalityCode', 'HH_WGT']
+# # based on the year set in the input data
+# pop = pop_total[['LocalMunicipalityCode', f'{year}_Total', f'{year}_Rural']].copy()
+# pop = pop.rename(columns={f'{year}_Total': f'Population_mun_{year}', f'{year}_Rural': f'Population_rural_mun_{year}'})
+# population_column = f'Population_mun_{year}'
+# population_column_rural = f'Population_rural_mun_{year}'
+#
+# # load household data for 2016:
+# hh = pd.read_csv(os.path.join(input_dir_processed + "hh_ruralurban_MUN_2016.csv"))
+#
+# # obtain columns relevant for calculations per dataset
+# CE11_columns_for_calc = ['SN', 'H_MUNIC', 'HHLD_10PERCENT_WGT']
+# CS16_columns_for_calc = ['UqNo', 'LocalMunicipalityCode', 'LocalMunicipalityName', 'hhld_pstrwgt']
+# CE22_columns_for_calc = ['QID', 'LocalMunicipalityCode', 'HH_WGT']
 
 ### Study Area calculations: area, population, households:
 
-hh = MUN_boundaries_16_EA.merge(hh, on='LocalMunicipalityCode', how='left')
-hh["Households_share_rural"] = hh['Rural Households'] / hh['Total Households']
-hh["Households_share_urban"] = hh['Urban Households'] / hh['Total Households']
+# hh = MUN_boundaries_16_EA.merge(hh, on='LocalMunicipalityCode', how='left')
+# hh["Households_share_rural"] = hh['Rural Households'] / hh['Total Households']
+# hh["Households_share_urban"] = hh['Urban Households'] / hh['Total Households']
 
 # area_stats = hh.describe()
 # area_stats.to_csv(os.path.join(output_dir_data, "municipal_background_stats_2016.csv"))
@@ -880,7 +883,7 @@ hh["Households_share_urban"] = hh['Urban Households'] / hh['Total Households']
 #
 # # save to CSV
 # afford_df_mun_elaborate.to_csv(os.path.join(output_dir_data, 'municipal_data', f'wef_affordability_mun_2011_{year}.csv'))
-
+#
 # # 2.4. ACCEPTABILITY DATA PROCESSING
 #
 # # Load files that were created in the preprocessing phase:
@@ -996,36 +999,49 @@ hh["Households_share_urban"] = hh['Urban Households'] / hh['Total Households']
 # # and limiting security aspect (i.e., security aspect with the lowest score) per resource:
 # for resource in ['W', 'E', 'F']:
 #     vars = [col for col in wef_security_reduced.columns if f'{resource}_' in col]
-#     wef_security_reduced[f'{resource}_security_mean'] = wef_security_reduced[vars].mean(axis=1)
 #     wef_security_reduced[f'{resource}_limiting_domain_value'] = wef_security_reduced[vars].min(axis=1)
 #     wef_security_reduced[f'{resource}_limiting_domain'] = wef_security_reduced[vars].idxmin(axis=1)
+#     wef_security_reduced[f'{resource}_security_mean'] = wef_security_reduced[vars].mean(axis=1)
+#     # slightly offset 0's by 0.001 to avoid 0 propagation in geometric and harmonic mean computation:
+#     wef_security_mean_calc = wef_security_reduced[vars] + epsilon
+#     wef_security_reduced[f'{resource}_security_geometric_mean'] = gmean(wef_security_mean_calc, axis=1, nan_policy='omit') - epsilon
+#     wef_security_reduced[f'{resource}_security_harmonic_mean'] = hmean(wef_security_mean_calc, axis=1, nan_policy='omit') - epsilon
 #
 # for aspect in ['availability', 'accessibility', 'affordability', 'acceptability']:
 #     vars = [col for col in wef_security_reduced.columns if f'_{aspect}' in col]
-#     wef_security_reduced[f'{aspect}_mean'] = wef_security_reduced[vars].mean(axis=1)
 #     wef_security_reduced[f'{aspect}_limiting_domain_value'] = wef_security_reduced[vars].min(axis=1, skipna=True)
 #     wef_security_reduced[f'{aspect}_limiting_domain'] = wef_security_reduced[vars].idxmin(axis=1, skipna=True)
-#
+#     wef_security_reduced[f'{aspect}_mean'] = wef_security_reduced[vars].mean(axis=1)
+#     # slightly offset 0's by 0.001 to avoid 0 propagation in geometric and harmonic mean computation:
+#     wef_security_mean_calc = wef_security_reduced[vars] + epsilon
+#     wef_security_reduced[f'{aspect}_geometric_mean'] = gmean(wef_security_mean_calc, axis=1, nan_policy='omit') - epsilon
+#     wef_security_reduced[f'{aspect}_harmonic_mean'] = hmean(wef_security_mean_calc, axis=1, nan_policy='omit') - epsilon
 #
 # # calculate WEF security values based on mean, lowest score (i.e., minimum value across all domain scores)
 # # and limiting security aspect (i.e., security aspect with the lowest score):
 # wef_security_reduced['WEF_security_mean'] = wef_security_reduced[['W_security_mean', 'E_security_mean', 'F_security_mean']].mean(axis=1)
+# wef_security_mean_calc = wef_security_reduced[final_domain_cols] + epsilon
+# wef_security_reduced['WEF_security_geometric_mean'] = gmean(wef_security_mean_calc, axis=1, nan_policy='omit') - epsilon
+# wef_security_reduced['WEF_security_harmonic_mean'] = hmean(wef_security_mean_calc, axis=1, nan_policy='omit') - epsilon
 # wef_security_reduced['WEF_limiting_domain_value'] = wef_security_reduced[final_domain_cols].min(axis=1)
 # wef_security_reduced['WEF_limiting_domain'] = wef_security_reduced[final_domain_cols].idxmin(axis=1)
 #
 # # calculate hotspots: number of domains below threshold value:
 # wef_security_reduced[f'Nr_domains_below_{threshold_value}'] = (wef_security_reduced[final_domain_cols] <= threshold_value).sum(1)
-# resource_cols_limiting = ['W_limiting_domain_value', 'E_limiting_domain_value', 'F_limiting_domain_value']
-# wef_security_reduced[f'Nr_resource_lims_below_{threshold_value}'] = (wef_security_reduced[resource_cols_limiting] <= threshold_value).sum(1)
-# dimension_cols_limiting = ['availability_limiting_domain_value', 'accessibility_limiting_domain_value',
-#                            'affordability_limiting_domain_value', 'acceptability_limiting_domain_value']
-# wef_security_reduced[f'Nr_dimension_lims_below_{threshold_value}'] = (wef_security_reduced[dimension_cols_limiting] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_resource_lims_below_{threshold_value}'] = (wef_security_reduced[['W_limiting_domain_value', 'E_limiting_domain_value', 'F_limiting_domain_value']] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_resource_mean_below_{threshold_value}'] = (wef_security_reduced[['W_security_mean', 'E_security_mean', 'F_security_mean']] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_resource_geomean_below_{threshold_value}'] = (wef_security_reduced[['W_security_geometric_mean', 'E_security_geometric_mean', 'F_security_geometric_mean']] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_resource_harmean_below_{threshold_value}'] = (wef_security_reduced[['W_security_harmonic_mean', 'E_security_harmonic_mean', 'F_security_harmonic_mean']] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_dimension_lims_below_{threshold_value}'] = (wef_security_reduced[['availability_limiting_domain_value', 'accessibility_limiting_domain_value', 'affordability_limiting_domain_value', 'acceptability_limiting_domain_value']] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_dimension_mean_below_{threshold_value}'] = (wef_security_reduced[['availability_mean', 'accessibility_mean', 'affordability_mean', 'acceptability_mean']] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_dimension_geomean_below_{threshold_value}'] = (wef_security_reduced[['availability_geometric_mean', 'accessibility_geometric_mean', 'affordability_geometric_mean', 'acceptability_geometric_mean']] <= threshold_value).sum(1)
+# wef_security_reduced[f'Nr_dimension_harmean_below_{threshold_value}'] = (wef_security_reduced[['availability_harmonic_mean', 'accessibility_harmonic_mean', 'affordability_harmonic_mean', 'acceptability_harmonic_mean']] <= threshold_value).sum(1)
 #
 # # statistics
 # wef_security_reduced_stats = obtain_descriptive_statistics_df(wef_security_reduced)
 # cols = (final_domain_cols + [col for col in wef_security_reduced.columns if 'limiting_domain_value' in col] +
 #         [col for col in wef_security_reduced.columns if 'mean' in col] +
-#         [col for col in wef_security_reduced.columns if '_below_' in col] )
+#         [col for col in wef_security_reduced.columns if '_below_' in col and not 'mean' in col])
 # wef_security_reduced_spatial_stats = obtain_spatial_statistics_df(wef_security_reduced, MUN_boundaries_16,
 #                                                           'LocalMunicipalityCode', cols)
 # wef_security_reduced_stats = wef_security_reduced_stats.merge(wef_security_reduced_spatial_stats, on='column', how='left')
@@ -1033,14 +1049,17 @@ hh["Households_share_urban"] = hh['Urban Households'] / hh['Total Households']
 # # correlation stats:
 # corr_table_wef4as = pg.pairwise_corr(wef_security_reduced[final_domain_cols], method='pearson')
 # corr_table_wef4as.to_csv(os.path.join(output_dir_data, f'wef_4As_correlations_{year}.csv'), index=False)
-# col_lims = resource_cols_limiting + dimension_cols_limiting
-# corr_table_limiting = pg.pairwise_corr(wef_security_reduced[col_lims], method='pearson')
-# corr_table_limiting.to_csv(os.path.join(output_dir_data, f'limiting_domains_correlations_{year}.csv'), index=False)
-
+# col_agg_lims = ['W_limiting_domain_value', 'E_limiting_domain_value', 'F_limiting_domain_value'] + ['availability_limiting_domain_value', 'accessibility_limiting_domain_value', 'affordability_limiting_domain_value', 'acceptability_limiting_domain_value']
+# corr_table_limiting = pg.pairwise_corr(wef_security_reduced[col_agg_lims], method='pearson')
+# corr_table_limiting.to_csv(os.path.join(output_dir_data, f'aggregated_domains_limiting_correlations_{year}.csv'), index=False)
+# col_agg_harmonic_mean = ['W_security_harmonic_mean', 'E_security_harmonic_mean', 'F_security_harmonic_mean'] + ['availability_harmonic_mean', 'accessibility_harmonic_mean', 'affordability_harmonic_mean', 'acceptability_harmonic_mean']
+# corr_table_harmonic_mean = pg.pairwise_corr(wef_security_reduced[col_agg_harmonic_mean], method='pearson')
+# corr_table_harmonic_mean.to_csv(os.path.join(output_dir_data, f'aggregated_domains_harmonic_mean_correlations_{year}.csv'), index=False)
+#
 # # Save WEF security and stats datasets to CSV
 # wef_security_reduced.to_csv(os.path.join(output_dir_data, 'municipal_data', f'wef_4As_reduced_mun_{year}.csv'), index=False)
 # wef_security_reduced_stats.to_csv(os.path.join(output_dir_data + f"wef_security_reduced_stats_{year}.csv"), index=False)
-#
+
 # ### SENSITIVITY ANALYSIS:
 # baseline_domains_map = {parse_domain(col): col for col in final_domain_cols}
 #
@@ -1124,7 +1143,6 @@ hh["Households_share_urban"] = hh['Urban Households'] / hh['Total Households']
 # reload the spatial data:
 MUN_boundaries_16 = load_spatial_data_gdb('MN', 2016, input_dir_raw)  # the relevant columns are called "LocalMunicipalityName" and "LocalMunicipalityCode"
 MUN_boundaries_16.loc[:, 'LocalMunicipalityName'] = MUN_boundaries_16['LocalMunicipalityName'].replace('New', 'Collins Chabane')
-PR_boundaries = load_spatial_data_shp('PR', 2011, input_dir_raw)  # PR boundaries haven't changed
 spatial_df = MUN_boundaries_16[['ProvinceName', 'LocalMunicipalityCode', 'LocalMunicipalityName', 'geometry']]
 
 # load the WEF security dataset:
@@ -1150,9 +1168,14 @@ domain_cols_elaborate = [col for col in wef_security_elaborate.columns if 'Local
 
 # plot_scattermatrix_group_regression(wef_security_reduced_geo, domain_cols_twelve, 'ProvinceName', 'WEF-4As domains', output_dir_figures, year)
 #
-# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['W_security_mean','E_security_mean', 'F_security_mean'], 'ProvinceName', 'combined resource', output_dir_figures, year)
-# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['W_limiting_domain_value','E_limiting_domain_value', 'F_limiting_domain_value'], 'ProvinceName', 'limiting WEF', output_dir_figures, year)
-# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['availability_limiting_domain_value','accessibility_limiting_domain_value', 'affordability_limiting_domain_value', 'acceptability_limiting_domain_value'], 'ProvinceName', 'limiting dimension', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['W_security_mean','E_security_mean', 'F_security_mean'], 'ProvinceName', 'resource mean', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['W_security_geometric_mean','E_security_geometric_mean', 'F_security_geometric_mean'], 'ProvinceName', 'resource geometric mean', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['W_security_harmonic_mean','E_security_harmonic_mean', 'F_security_harmonic_mean'], 'ProvinceName', 'resource harmonic mean', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['W_limiting_domain_value','E_limiting_domain_value', 'F_limiting_domain_value'], 'ProvinceName', 'resource limiting', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['availability_mean','accessibility_mean', 'affordability_mean', 'acceptability_mean'], 'ProvinceName', 'dimension mean', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['availability_geometric_mean','accessibility_geometric_mean', 'affordability_geometric_mean', 'acceptability_geometric_mean'], 'ProvinceName', 'dimension geometric mean', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['availability_harmonic_mean','accessibility_harmonic_mean', 'affordability_harmonic_mean', 'acceptability_harmonic_mean'], 'ProvinceName', 'dimension harmonic mean', output_dir_figures, year)
+# plot_scattermatrix_group_regression(wef_security_reduced_geo, ['availability_limiting_domain_value','accessibility_limiting_domain_value', 'affordability_limiting_domain_value', 'acceptability_limiting_domain_value'], 'ProvinceName', 'dimension limiting', output_dir_figures, year)
 
 # wef_security_reduced_geo = wef_security_reduced_geo.merge(pop, on='LocalMunicipalityCode', how='left')
 # pop_col = population_column_rural
@@ -1179,7 +1202,7 @@ domain_cols_elaborate = [col for col in wef_security_elaborate.columns if 'Local
 #     'E_': {"base_color": rgb255_to_rgba(255, 192, 0, 1), "label": "E"},
 #     'F_': {"base_color": rgb255_to_rgba(112, 173, 71, 1), "label": "F"}
 # }
-#
+
 # for item in ['availability', 'accessibility', 'affordability', 'acceptability']:
 #
 #     wef_security_reduced_geo = apply_styles(
@@ -1211,15 +1234,29 @@ domain_cols_elaborate = [col for col in wef_security_elaborate.columns if 'Local
 #     colour_column='WEF_limiting_domain_colours'
 # )
 
-# ### PLOT SPATIAL HOTSPOT ANALYSIS:
-map_hotspots(wef_security_reduced_geo, column=f'Nr_domains_below_{threshold_value}', area=area,
-             spatial_demarcation_gdf=PR_boundaries, path=output_dir_maps)
+## PLOT SPATIAL HOTSPOT ANALYSIS:
+# map_hotspots(wef_security_reduced_geo, column=f'Nr_domains_below_{threshold_value}', area=area,
+#              spatial_demarcation_gdf=PR_boundaries, path=output_dir_maps)
 
 # map_hotspots(wef_security_reduced_geo, column=[f'Nr_resource_lims_below_{threshold_value}',
 #                                                f'Nr_dimension_lims_below_{threshold_value}',
 #                                                f'Nr_domains_below_{threshold_value}'], area=area,
-#              spatial_demarcation_gdf=PR_boundaries, path=output_dir_maps, stats_df=stats)
-
+#              spatial_demarcation_gdf=PR_boundaries, path=output_dir_maps, stats_df=stats, agg_method='limiting_factor')
+#
+# map_hotspots(wef_security_reduced_geo, column=[f'Nr_resource_mean_below_{threshold_value}',
+#                                                f'Nr_dimension_mean_below_{threshold_value}',
+#                                                f'Nr_domains_below_{threshold_value}'], area=area,
+#              spatial_demarcation_gdf=PR_boundaries, path=output_dir_maps, stats_df=stats, agg_method='arithmetic_mean')
+#
+# map_hotspots(wef_security_reduced_geo, column=[f'Nr_resource_geomean_below_{threshold_value}',
+#                                                f'Nr_dimension_geomean_below_{threshold_value}',
+#                                                f'Nr_domains_below_{threshold_value}'], area=area,
+#              spatial_demarcation_gdf=PR_boundaries, path=output_dir_maps, stats_df=stats, agg_method='geometric_mean')
+#
+# map_hotspots(wef_security_reduced_geo, column=[f'Nr_resource_harmean_below_{threshold_value}',
+#                                                f'Nr_dimension_harmean_below_{threshold_value}',
+#                                                f'Nr_domains_below_{threshold_value}'], area=area,
+#              spatial_demarcation_gdf=PR_boundaries, path=output_dir_maps, stats_df=stats, agg_method='harmonic_mean')
 
 # # PLOT GRID: WEF-4As and aggregation plots in one grid:
 # nrows = 5
@@ -1252,7 +1289,6 @@ map_hotspots(wef_security_reduced_geo, column=f'Nr_domains_below_{threshold_valu
 # plot_grid_maps(gdf=wef_security_reduced_geo, columns_dict=columns, spatial_demarcation_gdf=PR_boundaries,
 #                plot_name=plot_name, path=output_dir_maps, dimensions_layout=dimension_layout, resource_layout=resource_layout,
 #                stats_gdf=stats)
-
 
 ### HEATMAP
 
@@ -1327,72 +1363,285 @@ map_hotspots(wef_security_reduced_geo, column=f'Nr_domains_below_{threshold_valu
 # spatial_sensitivity_results = pd.concat(spatial_sensitivity_results, ignore_index=True)
 # spatial_sensitivity_results.to_csv(os.path.join(output_dir_data, f'spatial_sensitivity_stats_{year}.csv'))
 
-# font = FontProperties(family='Times New Roman', weight='bold', size=10)
+# ### plot maps of sensitivity analysis per dimension:
+# columns_avail = ['W_availability_linear_minmax', 'E_availability', 'F_availability_rp_0.225_limiting_factor',
+#            'W_availability_categorical', 'E_availability_subst_only', 'F_availability_rp_0.1_limiting_factor',
+#            None, 'E_availability_lines_only', 'F_availability_rp_0.35_limiting_factor',
+#            None, 'E_availability_sensitivity_OSM', 'F_availability_protein_only_rp_0.225',
+#            None, None, 'F_availability_protein_only_rp_0.225']
 #
-# # columns = [col for col in wef_security_elaborate_geo if 'W_availability' in col]
-# columns = ['E_accessibility', 'E_accessibility_sensitivity']
-# n = len(columns)
+# plot_titles_avail = ['Water availability (baseline)', 'Energy availability (baseline)', 'Food availability (baseline)',
+#                'Water availability (categorical normalisation)', 'Energy availability (substations only)',
+#                'Food availability (protein ratio = 0.1)', None, 'Energy availability (power lines only)',
+#                'Food availability (protein ratio = 0.35)', None, 'Energy availability (OSM missing data)',
+#                'Food availability (energy sufficiency only)', None, None, 'Food availability (protein sufficiency only)']
 #
-# # --- layout: max 3 columns ---
-# ncols = min(2, n)
-# nrows = math.ceil(n / ncols)
+# plot_sensitivity_maps(gdf=wef_security_elaborate_geo, columns=columns_avail, titles=plot_titles_avail, area=area,
+#                       path=output_dir_maps, spatial_demarcation_gdf=PR_boundaries, plot_name='Availability_sensitivity_maps')
 #
-# fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=(5*ncols, 4*nrows), constrained_layout=True)
+# columns_access = ['W_accessibility_WHO_WHO_limiting_factor', 'E_accessibility', 'F_accessibility_maximum',
+#                   'W_accessibility_RDP_WHO_limiting_factor', 'E_accessibility_sensitivity', 'F_accessibility_infra_only',
+#                   'W_accessibility_WHO_SA_limiting_factor', None, 'F_accessibility_agri_only',
+#                   'W_accessibility_RDP_SA_limiting_factor', None, None]
 #
-# # make axs always iterable (even if 1 row)
-# axs = axs.flatten() if isinstance(axs, (list, np.ndarray)) else [axs]
+# plot_titles_access = ['Water accessibility (baseline)', 'Energy accessibility (baseline)', 'Food accessibility (baseline)',
+#                       'Water accessibility (SA piped water standard)', 'Energy accessibility (grid access only)',
+#                       'Food accessibility (supermarket presence only)',
+#                       'Water accessibility (SA sanitation standard)', None, 'Food accessibility (involvement in agriculture only)',
+#                       'Water accessibility (SA standards for both)', None, None]
 #
-# vmin, vmax = 0, 1
-# cmap = cmc.devon_r
+# plot_sensitivity_maps(gdf=wef_security_elaborate_geo, columns=columns_access, titles=plot_titles_access, area=area,
+#                       path=output_dir_maps, spatial_demarcation_gdf=PR_boundaries, plot_name='Accessibility_sensitivity_maps')
 #
-# for i, col in enumerate(columns):
-#     ax = axs[i]
+# columns_afford = ['W_affordability_highreqs_2016', 'E_affordability_highreqs_2016', 'F_affordability_highreqs_2016',
+#                   'W_affordability_highreqs_FBW_2016', 'E_affordability_highreqs_FBE_2016', 'F_affordability_lowreqs_2016']
 #
-#     wef_security_elaborate_geo.plot(
-#         ax=ax,
-#         column=col,
-#         cmap=cmap,
-#         vmin=vmin,
-#         vmax=vmax,
-#         legend=False,
-#         edgecolor='black',
-#         linewidth=0.25,
-#         missing_kwds={'color': 'lightcoral', 'edgecolor':'black'}
-#     )
+# plot_titles_afford = ['Water affordability (baseline)', 'Energy affordability (baseline)', 'Food affordability (baseline)',
+#                       'Water affordability (including Free Basic Water)', 'Energy affordability (including Free Basic Electricity)',
+#                       'Food affordability (regular food basket)']
 #
-#     PR_boundaries.plot(ax=ax, facecolor='none', edgecolor='black')
-#     cx.add_basemap(ax, source=cx.providers.CartoDB.PositronNoLabels)
-#     ax.axis('off')
+# plot_sensitivity_maps(gdf=wef_security_elaborate_geo, columns=columns_afford, titles=plot_titles_afford, area=area,
+#                       path=output_dir_maps, spatial_demarcation_gdf=PR_boundaries, plot_name='Affordability_sensitivity_maps')
 #
-#     mean = round(wef_security_elaborate_geo[col].mean(), 2)
-#     ax.text(0.02, 0.98, f"mean = {mean}",
-#             transform=ax.transAxes,
-#             fontsize=10, font="Times New Roman",
-#             verticalalignment='top')
+# columns_accept = ['W_acceptability_WHO_limiting_factor', 'E_acceptability_limiting_factor', 'F_acceptability',
+#                   'W_acceptability_SA_limiting_factor', 'E_acceptability_fuel_only', 'F_acceptability_sensitivity',
+#                   None, 'E_acceptability_sensitivity', None]
 #
-# # remove unused axes (if any)
-# for j in range(i + 1, len(axs)):
-#     fig.delaxes(axs[j])
+# plot_titles_accept = ['Water acceptability (baseline)', 'Energy acceptability (baseline)', 'Food acceptability (baseline)',
+#                       'Water acceptability (SA interruption standard)', 'Energy acceptability (clean fuel indicator only)',
+#                       'Food acceptability (threshold of 5 days)', None, 'Energy acceptability (perception indicator)', None]
 #
-# # --- shared colorbar ---
-# norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
-# sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
-# sm._A = []
-#
-# cbar = fig.colorbar(
-#     sm,
-#     ax=axs[:n],          # only the used axes
-#     location='right',
-#     fraction=0.05,
-#     pad=0.02,
-#     shrink=0.8           # adjust height if desired
-# )
-#
-# axs[0].set_title('Energy accessibility (baseline)', font_properties=font)
-# axs[1].set_title('Energy accessibility (grid access only)', font_properties=font)
-# axs[2].set_title('Water accessibility (SA sanitation standard)', font_properties=font)
-# axs[3].set_title('Water accessibility (SA standards for both)', font_properties=font)
-# axs[4].set_title('Food availability (protein sufficiency only)', font_properties=font)
+# plot_sensitivity_maps(gdf=wef_security_elaborate_geo, columns=columns_accept, titles=plot_titles_accept, area=area,
+#                       path=output_dir_maps, spatial_demarcation_gdf=PR_boundaries, plot_name='Acceptability_sensitivity_maps')
 
-# plt.savefig(os.path.join(output_dir_maps, 'E_accessibility_sensitivity_maps.jpeg'))
-# plt.close(fig)
+# ### Aggregation sensitivity analysis and mapping
+# # obtain aggregation sensitivity statistics on mean value changes, rank changes, correlation coefficients, and save as csv.
+# df = wef_security_reduced_geo
+#
+# # calculate ranks:
+# cols = [col for col in df.columns if 'limiting_domain_value' in col or 'harmonic_mean' in col or 'geometric_mean' in col]
+# for col in cols:
+#     df[f'{col}_rank'] = df[col].rank(ascending=0, method='min')
+
+# dict = {"W": {}, "E": {}, "F": {}, "availability": {}, "accessibility": {}, "affordability": {}, "acceptability": {},
+#         "WEF": {}}
+# for type in ['W', 'E', 'F', 'availability', 'accessibility', 'affordability', 'acceptability', 'WEF']:
+#     lim_col = f'{type}_limiting_domain_value'
+#     if type in ['W', 'E', 'F', 'WEF']:
+#         harmean_col = f'{type}_security_harmonic_mean'
+#         geomean_col = f'{type}_security_geometric_mean'
+#     elif type in ['availability', 'accessibility', 'affordability', 'acceptability']:
+#         harmean_col = f'{type}_harmonic_mean'
+#         geomean_col = f'{type}_geometric_mean'
+#     # mean value difference:
+#     value_change_mean_harmean = (df[harmean_col] - df[lim_col]).sum() / df[harmean_col].count()
+#     value_change_mean_geomean = (df[geomean_col] - df[lim_col]).sum() / df[geomean_col].count()
+#     mean_value_change_harmean = (df[harmean_col].mean() - df[lim_col].mean()) / df[lim_col].mean() * 100
+#     mean_value_change_geomean = (df[geomean_col].mean() - df[lim_col].mean()) / df[lim_col].mean() * 100
+#     x, y = df[lim_col], df[harmean_col]
+#     nas = np.logical_or(np.isnan(x), np.isnan(y))
+#     corr1_harmean = pearsonr(x[~nas], y[~nas])
+#     corr2_harmean = spearmanr(x[~nas], y[~nas])
+#     df[f'{type}_rank_diff_harmean'] = df[f'{lim_col}_rank'] - df[f'{harmean_col}_rank']
+#     av_diff_harmean = (abs(df[f'{type}_rank_diff_harmean'])).sum() / df[f'{type}_rank_diff_harmean'].count()
+#
+#     x, y = df[lim_col], df[geomean_col]
+#     nas = np.logical_or(np.isnan(x), np.isnan(y))
+#     corr1_geomean = pearsonr(x[~nas], y[~nas])
+#     corr2_geomean = spearmanr(x[~nas], y[~nas])
+#     df[f'{type}_rank_diff_geomean'] = df[f'{lim_col}_rank'] - df[f'{geomean_col}_rank']
+#     av_diff_geomean = (abs(df[f'{type}_rank_diff_geomean'])).sum() / df[f'{type}_rank_diff_geomean'].count()
+#     nr_muns_below_threshold_lims = (df[lim_col] <= 0.5).sum()
+#     nr_muns_below_threshold_harmean = (df[harmean_col] <= 0.5).sum()
+#     nr_muns_below_threshold_geomean = (df[geomean_col] <= 0.5).sum()
+#     diff_nr_muns_harmean = nr_muns_below_threshold_harmean - nr_muns_below_threshold_lims
+#     diff_nr_muns_geomean = nr_muns_below_threshold_geomean - nr_muns_below_threshold_lims
+#     dict[type].update({"mean_value_change_perc_harmean": mean_value_change_harmean,
+#                        "mean_value_change_perc_geomean": mean_value_change_geomean,
+#                        "value_change_mean_harmean": value_change_mean_harmean,
+#                        "value_change_mean_geomean": value_change_mean_geomean,
+#                        "Pearson's R_harmean": corr1_harmean[0],
+#                        "Pearson's R_geomean": corr1_geomean[0],
+#                        "mean_rank_change_harmean": av_diff_harmean,
+#                        "mean_rank_change_geomean": av_diff_geomean,
+#                        "Spearman's rho_harmean": corr2_harmean[0],
+#                        "Spearman's rho_geomean": corr2_geomean[0],
+#                        "muns_below_threshold_lims": nr_muns_below_threshold_lims,
+#                        "muns_below_threshold_harmean": nr_muns_below_threshold_harmean,
+#                        "muns_below_threshold_geomean": nr_muns_below_threshold_geomean,
+#                        "difference_muns_below_threshold_harmean": diff_nr_muns_harmean,
+#                        "difference_muns_below_threshold_geomean": diff_nr_muns_geomean})
+# dict_df = pd.DataFrame.from_dict(dict, orient='index')
+# dict_df.to_csv(os.path.join(output_dir_data, f'aggregation_sensitivity_{year}.csv'), index=False)
+
+
+# # plotting of ranks and value correlations across aggregation approaches:
+# for agg_method in ['geometric', 'harmonic']:
+#     plots_score = [
+#         {'x': 'availability_limiting_domain_value', 'y': f'availability_{agg_method}_mean', 'title': 'Agg. availability score'},
+#         {'x': 'accessibility_limiting_domain_value', 'y': f'accessibility_{agg_method}_mean', 'title': 'Agg. accessibility score'},
+#         {'x': 'affordability_limiting_domain_value', 'y': f'affordability_{agg_method}_mean', 'title': 'Agg. affordability score'},
+#         {'x': 'acceptability_limiting_domain_value', 'y': f'acceptability_{agg_method}_mean', 'title': 'Agg. acceptability score'},
+#         {'x': 'W_limiting_domain_value', 'y': f'W_security_{agg_method}_mean', 'title': 'Aggregated W score'},
+#         {'x': 'E_limiting_domain_value', 'y': f'E_security_{agg_method}_mean', 'title': 'Aggregated E score'},
+#         {'x': 'F_limiting_domain_value', 'y': f'F_security_{agg_method}_mean', 'title': 'Aggregated F score'},
+#         {'x': 'WEF_limiting_domain_value', 'y': f'WEF_security_{agg_method}_mean', 'title': 'Aggregated WEF score'}
+#     ]
+#
+#     plots_rank = [
+#         {'x': 'availability_limiting_domain_value_rank', 'y': f'availability_{agg_method}_mean_rank', 'title': 'Agg. availability rank'},
+#         {'x': 'accessibility_limiting_domain_value_rank', 'y': f'accessibility_{agg_method}_mean_rank', 'title': 'Agg. accessibility rank'},
+#         {'x': 'affordability_limiting_domain_value_rank', 'y': f'affordability_{agg_method}_mean_rank', 'title': 'Agg. affordability rank'},
+#         {'x': 'acceptability_limiting_domain_value_rank', 'y': f'acceptability_{agg_method}_mean_rank', 'title': 'Agg. acceptability rank'},
+#         {'x': 'W_limiting_domain_value_rank', 'y': f'W_security_{agg_method}_mean_rank', 'title': 'Aggregated W rank'},
+#         {'x': 'E_limiting_domain_value_rank', 'y': f'E_security_{agg_method}_mean_rank', 'title': 'Aggregated E rank'},
+#         {'x': 'F_limiting_domain_value_rank', 'y': f'F_security_{agg_method}_mean_rank', 'title': 'Aggregated F rank'},
+#         {'x': 'WEF_limiting_domain_value_rank', 'y': f'WEF_security_{agg_method}_mean_rank', 'title': 'Aggregated WEF rank'}
+#     ]
+#
+#     plot_scatter_grid(gdf=df, nrows=2, ncols=4, plots=plots_score, xlabel='Limiting factor aggregation',
+#                       ylabel=f'{agg_method} mean aggregation', plot_name=f'Correlations_aggregated_scores_{agg_method}_limfactor',
+#                       output_path=output_dir_figures)
+#
+#     plot_scatter_grid(gdf=df, nrows=2, ncols=4, plots=plots_rank, xlabel='Limiting factor aggregation rank',
+#                       ylabel=f'{agg_method} mean aggregation rank', plot_name=f'Correlations_aggregated_ranks_{agg_method}_limfactor',
+#                       output_path=output_dir_figures, scatter_kwargs={'color': 'y'})
+
+## plotting of aggregated maps in grid for sensitivity analysis:
+# columns_dimensions_agg = ['availability_limiting_domain_value', 'availability_harmonic_mean', 'availability_geometric_mean',
+#                           'accessibility_limiting_domain_value', 'accessibility_harmonic_mean', 'accessibility_geometric_mean',
+#                           'affordability_limiting_domain_value', 'affordability_harmonic_mean', 'affordability_geometric_mean',
+#                           'acceptability_limiting_domain_value', 'acceptability_harmonic_mean', 'acceptability_geometric_mean']
+#
+# plot_titles_dimensions_agg = ['Availability - limiting resource', 'Availability - harmonic mean', 'Availability - geometric mean',
+#                               'Accessibility - limiting resource', 'Accessibility - harmonic mean', 'Accessibility - geometric mean',
+#                               'Affordability - limiting resource', 'Affordability - harmonic mean', 'Affordability - geometric mean',
+#                               'Acceptability - limiting resource', 'Acceptability - harmonic mean', 'Acceptability - geometric mean']
+#
+# plot_sensitivity_maps(gdf=wef_security_reduced_geo, columns=columns_dimensions_agg, titles=plot_titles_dimensions_agg, area=area,
+#                       path=output_dir_maps, spatial_demarcation_gdf=PR_boundaries, plot_name='Dimension_aggregation_sensitivity_maps', stats_df=stats)
+
+# # For plotting these aggregates, change the number of columns in the plot_sensitivity_maps function to 4
+# columns_resources_agg = ['W_limiting_domain_value', 'E_limiting_domain_value', 'F_limiting_domain_value', 'WEF_limiting_domain_value',
+#                          'W_security_harmonic_mean', 'E_security_harmonic_mean', 'F_security_harmonic_mean', 'WEF_security_harmonic_mean',
+#                          'W_security_geometric_mean', 'E_security_geometric_mean', 'F_security_geometric_mean', 'WEF_security_geometric_mean']
+#
+# plot_titles_resources_agg = ['Water - limiting dimension', 'Energy - limiting dimension', 'Food - limiting dimension', 'WEF - limiting dimension',
+#                              'Water - harmonic mean', 'Energy - harmonic mean', 'Food - harmonic mean', 'WEF - harmonic mean',
+#                              'Water - geometric mean', 'Energy - geometric mean', 'Food - geometric mean', 'WEF - geometric mean']
+#
+# plot_sensitivity_maps(gdf=wef_security_reduced_geo, columns=columns_resources_agg, titles=plot_titles_resources_agg, area=area,
+#                       path=output_dir_maps, spatial_demarcation_gdf=PR_boundaries, plot_name='Resource_aggregation_sensitivity_maps', stats_df=stats)
+
+## plotting of full map grid for sensitivity analysis:
+# columns_lim_scale = {
+#     f'W_availability_{w_availability_threshold}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_availability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_availability_rp_{protein_fraction}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "availability_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_accessibility_{W_access_piped_standard}_{W_sanitation_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_accessibility': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_accessibility_maximum': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "accessibility_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "affordability_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_acceptability_{W_interruptions_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_acceptability_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_acceptability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "acceptability_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "W_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "E_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "F_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "WEF_limiting_domain_value": {'plot_func':plot_map_for_grid, 'correlation':'Yes'}
+# }
+#
+# plot_name = f'WEF_4As_{year}_full_aggregation_values'
+# plot_grid_maps(gdf=wef_security_reduced_geo, columns_dict=columns_lim_scale, spatial_demarcation_gdf=PR_boundaries,
+#                plot_name=plot_name, path=output_dir_maps, dimensions_layout=dimension_layout, resource_layout=resource_layout,
+#                stats_gdf=stats)
+
+# columns_mean = {
+#     f'W_availability_{w_availability_threshold}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_availability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_availability_rp_{protein_fraction}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "availability_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_accessibility_{W_access_piped_standard}_{W_sanitation_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_accessibility': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_accessibility_maximum': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "accessibility_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "affordability_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_acceptability_{W_interruptions_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_acceptability_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_acceptability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "acceptability_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "W_security_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "E_security_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "F_security_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "WEF_security_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'}
+# }
+#
+# plot_name = f'WEF_4As_{year}_full_aggregation_mean'
+# plot_grid_maps(gdf=wef_security_reduced_geo, columns_dict=columns_mean, spatial_demarcation_gdf=PR_boundaries,
+#                plot_name=plot_name, path=output_dir_maps, dimensions_layout=dimension_layout, resource_layout=resource_layout,
+#                stats_gdf=stats)
+#
+# columns_geomean = {
+#     f'W_availability_{w_availability_threshold}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_availability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_availability_rp_{protein_fraction}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "availability_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_accessibility_{W_access_piped_standard}_{W_sanitation_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_accessibility': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_accessibility_maximum': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "accessibility_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "affordability_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_acceptability_{W_interruptions_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_acceptability_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_acceptability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "acceptability_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "W_security_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "E_security_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "F_security_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "WEF_security_geometric_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'}
+# }
+#
+# plot_name = f'WEF_4As_{year}_full_aggregation_geometric_mean'
+# plot_grid_maps(gdf=wef_security_reduced_geo, columns_dict=columns_geomean, spatial_demarcation_gdf=PR_boundaries,
+#                plot_name=plot_name, path=output_dir_maps, dimensions_layout=dimension_layout, resource_layout=resource_layout,
+#                stats_gdf=stats)
+#
+# columns_harmean = {
+#     f'W_availability_{w_availability_threshold}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_availability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_availability_rp_{protein_fraction}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "availability_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_accessibility_{W_access_piped_standard}_{W_sanitation_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'E_accessibility': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_accessibility_maximum': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "accessibility_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'F_affordability_{reqs}reqs_{year}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "affordability_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'W_acceptability_{W_interruptions_standard}_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     f'E_acceptability_{aggregation_method}': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     'F_acceptability': {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "acceptability_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "W_security_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "E_security_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "F_security_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'},
+#     "WEF_security_harmonic_mean": {'plot_func':plot_map_for_grid, 'correlation':'Yes'}
+# }
+#
+# plot_name = f'WEF_4As_{year}_full_aggregation_harmonic_mean'
+# plot_grid_maps(gdf=wef_security_reduced_geo, columns_dict=columns_harmean, spatial_demarcation_gdf=PR_boundaries,
+#                plot_name=plot_name, path=output_dir_maps, dimensions_layout=dimension_layout, resource_layout=resource_layout,
+#                stats_gdf=stats)

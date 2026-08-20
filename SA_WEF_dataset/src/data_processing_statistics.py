@@ -4,10 +4,16 @@ import geopandas as gpd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from scipy.stats import pearsonr
+from scipy.stats import pearsonr, hmean, spearmanr
+from scipy.stats.mstats import gmean
 from matplotlib.font_manager import FontProperties
 from libpysal.weights import Queen, w_subset
 from esda.moran import Moran
+import pingouin as pg
+import statistics
+
+
+### Statistics functions
 
 def obtain_descriptive_statistics_df(df):
 
@@ -43,6 +49,10 @@ def obtain_spatial_statistics_df(df, gdf, merge_column: str, stats_cols: list):
 
     return moran_df
 
+
+### Plotting functions:
+
+
 def plot_scattermatrix(gdf, columns: list, grouping_col, path):
 
     plot_name = f'Scatter matrix of {columns} sorted per {grouping_col}.jpeg'
@@ -67,16 +77,6 @@ def plot_scattermatrix(gdf, columns: list, grouping_col, path):
 
     plt.savefig(plot_file, bbox_inches='tight')
     plt.close()
-
-def shorten_label(col: str) -> str:
-    """
-    Convert W_availability_xxx → W availability.
-    Keep first letter + second part (availability/accessibility/affordability/acceptability).
-    """
-    parts = col.split("_")
-    if len(parts) >= 2:
-        return f"{parts[0]} {parts[1]}"
-    return col
 
 def plot_scattermatrix_group_regression(gdf, columns: list, grouping_col, plot_name: str, path: str, year, size_col=None):
 
@@ -234,6 +234,177 @@ def create_heatmap(gdf, column1: str, column2: str, path, year, row_keywords=Non
     plt.tight_layout()
     plt.savefig(plot_file, bbox_inches='tight')
     plt.close()
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.font_manager import FontProperties
+
+
+def plot_scatter_grid(gdf, nrows, ncols, plots, plot_name, output_path, xlabel=None, ylabel=None, figsize=None, sharex=True,
+                      sharey=True, add_1to1_line=True, scatter_kwargs=None):
+    """
+    Plot multiple scatter plots in a grid and save the figure.
+
+    Parameters
+    ----------
+    dataframe : pandas.DataFrame
+        DataFrame containing the data.
+
+    nrows : int
+        Number of rows in the subplot grid.
+
+    ncols : int
+        Number of columns in the subplot grid.
+
+    plots : list or dict
+        Definition of the individual scatter plots.
+
+        If a list is supplied, each item should be a dictionary:
+            {
+                'x': 'x_column',
+                'y': 'y_column',
+                'title': 'Plot title'
+            }
+
+        If a dictionary is supplied, the key can be used as the
+        subplot title, e.g.:
+            {
+                'Aggregated W score': {
+                    'x': 'W_limiting_domain_value',
+                    'y': 'W_security_geometric_mean'
+                }
+            }
+
+        Use None for an empty subplot.
+
+    output_path : str
+        Full path, including filename, where the figure is saved.
+
+    xlabel : str, optional
+        Shared x-axis label.
+
+    ylabel : str, optional
+        Shared y-axis label.
+
+    figsize : tuple, optional
+        Figure size. If None, defaults to
+        (2.5 * ncols, 2.5 * nrows).
+
+    sharex : bool, default=True
+        Whether subplots share the x-axis.
+
+    sharey : bool, default=True
+        Whether subplots share the y-axis.
+
+    add_1to1_line : bool, default=True
+        Whether to add a y=x reference line to every subplot.
+
+    scatter_kwargs : dict, optional
+        Additional keyword arguments passed to ax.scatter().
+        Example: {'color': 'y', 's': 10}
+
+    """
+
+    # ---------------------------------------------------------
+    # Validation
+    # ---------------------------------------------------------
+
+    nplots = nrows * ncols
+
+    if isinstance(plots, dict):
+        plot_items = []
+
+        for title, values in plots.items():
+
+            if values is None:
+                plot_items.append(None)
+            else:
+                plot_items.append({
+                    'x': values['x'],
+                    'y': values['y'],
+                    'title': title
+                })
+
+    elif isinstance(plots, (list, tuple)):
+        plot_items = list(plots)
+
+    else:
+        raise TypeError("`plots` must be a list or dictionary.")
+
+    if len(plot_items) > nplots:
+        raise ValueError(
+            f"You supplied {len(plot_items)} plots, "
+            f"but the grid only has {nplots} positions."
+        )
+
+    # Fill remaining grid positions with None
+    plot_items += [None] * (nplots - len(plot_items))
+
+    # set style
+    font = FontProperties(family='Times New Roman', weight='bold', size=12)
+    if figsize is None:
+        figsize = (2.5 * ncols, 2.5 * nrows)
+
+    if scatter_kwargs is None:
+        scatter_kwargs = {}
+
+    fig, axs = plt.subplots(nrows, ncols, figsize=figsize, sharex=sharex, sharey=sharey, layout='constrained')
+
+    axs = np.atleast_1d(axs).flatten()
+
+    # Plot each subplot
+    for i, plot in enumerate(plot_items):
+
+        ax = axs[i]
+
+        # Empty subplot
+        if plot is None:
+            ax.axis('off')
+            continue
+
+        x_col = plot['x']
+        y_col = plot['y']
+        title = plot.get('title', None)
+
+        ax.scatter(gdf[x_col], gdf[y_col], **scatter_kwargs)
+
+        # 1:1 line
+        if add_1to1_line:
+            ax.axline((0, 0), slope=1)
+
+        # Title
+        if title is not None:
+            ax.set_title(title, font_properties=font)
+
+    # Shared axis labels:
+    if xlabel is not None:
+        fig.supxlabel(xlabel, fontproperties=font)
+
+    if ylabel is not None:
+        fig.supylabel(ylabel, fontproperties=font)
+
+    # ---------------------------------------------------------
+    # Save
+    # ---------------------------------------------------------
+
+    plot_name = f'{plot_name}.jpeg'
+    plot_file = os.path.join(output_path, plot_name)
+    plt.savefig(plot_file, bbox_inches='tight')
+    plt.close(fig)
+
+### ------ HELPER FUNCTIONS ------
+
+def shorten_label(col: str) -> str:
+    """
+    Convert W_availability_xxx → W availability.
+    Keep first letter + second part (availability/accessibility/affordability/acceptability).
+    """
+    parts = col.split("_")
+    if len(parts) >= 2:
+        return f"{parts[0]} {parts[1]}"
+    return col
+
 
 def add_regression_with_significance(ax, x, y, color="black", show_line=True):
     """

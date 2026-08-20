@@ -16,7 +16,6 @@ import fiona
 import math
 import textwrap
 
-
 mpl.rcParams['hatch.linewidth'] = 0.15
 
 def load_spatial_data_shp(spatial_abbrev: str, year: int, input_dir: str) -> gpd.GeoDataFrame:
@@ -198,7 +197,7 @@ def map_column_categorical(gdf, column, spatial_demarcation_gdf, colour_mapping:
     plt.savefig(plot_file, bbox_inches='tight')
     plt.close(fig)
 
-def map_hotspots(gdf, column, area, spatial_demarcation_gdf, path, stats_df=None):
+def map_hotspots(gdf, column, area, spatial_demarcation_gdf, path, stats_df=None, agg_method=None):
 
     # Reproject to Web Mercator if needed
     if gdf.crs != "EPSG:3857":
@@ -218,7 +217,7 @@ def map_hotspots(gdf, column, area, spatial_demarcation_gdf, path, stats_df=None
 
     nr = len(columns)
 
-    plot_name = f'Hotspot_analysis_{area}_{nr}.jpeg'
+    plot_name = f'Hotspot_analysis_{agg_method}_{area}_{nr}.jpeg'
     plot_file = os.path.join(path, plot_name)
 
     # set figure size
@@ -412,7 +411,7 @@ def plot_grid_maps(gdf, columns_dict, spatial_demarcation_gdf, plot_name, path, 
         fig.suptitle(suptitle)
 
     # plt.savefig(os.path.join(path, f'{plot_name}.svg'))
-    plt.savefig(os.path.join(path, f'{plot_name}_500dpi.jpeg'), dpi=500)
+    plt.savefig(os.path.join(path, f'{plot_name}_300dpi.jpeg'), dpi=300)
     plt.close(fig)
 
     return fig
@@ -533,6 +532,115 @@ def plot_hatch_map_for_grid(ax, gdf, col, spatial_demarcation_gdf):
 
     # # Remove axis ticks for clean maps
     # ax.set_axis_off()
+
+def plot_sensitivity_maps(gdf, columns, titles, area, path, spatial_demarcation_gdf, plot_name, stats_df=None):
+
+    """
+    Plot multiple GeoDataFrame columns in a grid.
+
+    Parameters
+    ----------
+    gdf: geopandas.GeoDataFrame
+        GeoDataFrame containing the columns to plot.
+
+    columns : list
+        List of column names to plot. Use None to leave a grid position empty.
+
+    titles : list
+        List of titles corresponding to `columns`. Use None for empty positions.
+
+    output_path : str
+        Full path, including filename, where the figure will be saved.
+
+    PR_boundaries : geopandas.GeoDataFrame
+        GeoDataFrame containing the boundaries to overlay on each map.
+        :param stats_df: dataframe with statistics
+
+    """
+
+    if len(columns) != len(titles):
+        raise ValueError(
+            f"`columns` and `titles` must have the same length. "
+            f"Got {len(columns)} columns and {len(titles)} titles."
+        )
+
+    # Set style options
+    cmap = cmc.devon_r
+    font = FontProperties(family='Times New Roman', weight='bold', size=10)
+    ncols = 3
+    figsize_per_subplot = (5, 4)
+
+    # Reproject to Web Mercator if needed
+    if gdf.crs != "EPSG:3857":
+        gdf = gdf.to_crs(epsg=3857)
+        spatial_demarcation_gdf = spatial_demarcation_gdf.to_crs(epsg=3857)
+
+    # set grid dimensions
+    n = len(columns)
+    nrows = math.ceil(n / ncols)
+
+    fig, axs = plt.subplots(nrows=nrows, ncols=ncols,
+                            figsize=(figsize_per_subplot[0] * ncols, figsize_per_subplot[1] * nrows),
+                            constrained_layout=True
+    )
+
+    axs = np.atleast_1d(axs).flatten()
+
+    # plot list of columns
+    for i, (col, title) in enumerate(zip(columns, titles)):
+
+        ax = axs[i]
+
+        # Leave this position empty
+        if col is None:
+            ax.axis('off')
+            continue
+
+        if col is not None and stats_df is not None:
+
+            I_value = stats_df.loc[stats_df['column'] == col, 'moran_I'].squeeze()
+            I_value = round(I_value, 2)
+            ax.text(0.02, 0.98, f"GMI = {I_value}", transform=ax.transAxes, fontsize=12, font="Times New Roman",
+                    verticalalignment='top')
+
+            # Only plot p-value if Moran’s I is valid
+            if not np.isnan(I_value):
+                p_value = stats_df.loc[stats_df['column'] == col, 'moran_p_value'].squeeze()
+                ax.text(0.02, 0.90, f"p = {p_value}", transform=ax.transAxes, fontsize=12,
+                        font="Times New Roman", verticalalignment='top')
+        else:
+            # Mean value
+            mean = round(gdf[col].mean(), 2)
+            ax.text(0.02, 0.98, f"mean = {mean}", transform=ax.transAxes, fontsize=10, font="Times New Roman",
+                    verticalalignment='top')
+
+        # Plot the data
+        gdf.plot(ax=ax, column=col, cmap=cmap, vmin=0, vmax=1, legend=False, edgecolor='black', linewidth=0.25,
+                 missing_kwds={'color': 'lightcoral', 'edgecolor': 'black'})
+
+        # Add boundaries
+        spatial_demarcation_gdf.plot(ax=ax, facecolor='none', edgecolor='black')
+        # Add basemap
+        cx.add_basemap(ax, source=cx.providers.CartoDB.PositronNoLabels)
+        ax.axis('off')
+
+        # Title
+        if title is not None:
+            ax.set_title(title, font_properties=font)
+
+    for j in range(n, len(axs)):
+        fig.delaxes(axs[j])
+
+    # create a shared color bar
+    plot_axes = [axs[i] for i, col in enumerate(columns) if col is not None]
+    norm = mpl.colors.Normalize(vmin=0, vmax=1)
+    sm = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
+    sm._A = []
+    fig.colorbar(sm,ax=plot_axes, location='right', fraction=0.03, pad=0.02, shrink=0.5)
+
+    # save figure
+    plt.savefig(os.path.join(path, f'{plot_name}_{area}.jpeg'), dpi=300)
+    plt.close(fig)
 
 ### ------ HELPER FUNCTIONS ------
 

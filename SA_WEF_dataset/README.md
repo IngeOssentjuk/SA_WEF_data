@@ -41,5 +41,6 @@ for public health and the consequences of climate change*, funded by NWO (grant 
 
 ## Acknowledgments 
 
-The author wants to thank Menno Straatsma for his help in setting up the raster calculations in Jupyter Notebook scripts, 
-and Garrett Speed for his help in preparing publication of the repository. 
+The author wants to thank Menno Straatsma for his help in setting up the raster calculations in Jupyter Notebook scripts,  
+Garrett Speed for his help in preparing publication of the repository and the project colleagues at SAEON for their careful 
+curation of the resulting datasets (in specific, Lindsay Callaghan & Caroline Mfopa). 
